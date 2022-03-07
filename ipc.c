@@ -25,10 +25,16 @@ int main(int argc, char** argv) {
 	pid_t son;
 
   // Creates the shared memory object
-  fd = shm_open("/memory", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  fd = shm_open("/memory", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IXUSR);
   if (fd == -1) { // Checks error
     fprintf(stderr, "Fallo al crear el file descriptor\n");
     return -1;
+  }
+
+  // Truncating memory
+  int rc = ftruncate(fd, PAGE_SIZE);
+  if (rc == -1) {
+    fprintf(stderr, "Fallo al extender la memoria\n");
   }
 
   // Now opens a mmap
@@ -57,19 +63,23 @@ int main(int argc, char** argv) {
     int son_value = 0;
     int to_dad = 0;
 
+    // Se suman indices para encontrar en dnde escribir
+    while (1) {
+      if (shared_memory[to_dad] == NULL) {
+        break;
+      }
+      to_dad++;
+    }
+
+
     // Cerrar pipes que no se usan
     close(pipe_parent[WRITE]);
     close(pipe_son[READ]);
 
-    while (to_dad < 5) {
+    while (1) {
       if (read(pipe_parent[READ], &son_value, sizeof(son_value)) > 0) {
+        shared_memory[to_dad] = x;
         to_dad++;
-
-        printf("-----------------aaaaa %c %d\n", x, to_dad);
-        shared_memory[to_dad] = argv[2];
-        printf("-----------------aaaaa\n");
-        printf("----------------- %c %c\n", shared_memory[0], x);
-
       } else {
         break;
       }
@@ -84,6 +94,7 @@ int main(int argc, char** argv) {
     // Cerrar pipes que no se usan
     int parent_value = 1;
     int from_son = 0;
+    int current_pos = 0;
     close(pipe_parent[READ]);
     close(pipe_son[WRITE]);
 
@@ -105,6 +116,16 @@ int main(int argc, char** argv) {
     // Cerrando pipes al finalizar
     close(pipe_parent[WRITE]);
     close(pipe_son[READ]);
+
+    // Se muestra la informacion
+    printf("Se muestra lo que esta escrito en memoria:\n");
+    while (1) {
+      if (shared_memory[current_pos] == NULL) {
+        break;
+      }
+      printf("%c", shared_memory[current_pos]);
+    }
+    printf("\n");
   }
 
   return 0;
